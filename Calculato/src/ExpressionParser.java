@@ -10,9 +10,8 @@ public class ExpressionParser {
     private final Map<String, Complex> allVariables;
 
     private Node root;
-    private Complex lastResult; // guarda resultado para mostrar no topo da árvore
+    private Complex lastResult;
 
-    // Nó interno da AST
     private static class Node {
         String value;
         Node left, right;
@@ -30,7 +29,6 @@ public class ExpressionParser {
     }
 
     public ExpressionParser(String expression, Map<String, Complex> variables) {
-        // aplica preprocess (multiplicação implícita) e remove espaços
         this.expression = preprocess(expression.replaceAll("\\s+", ""));
         this.position = 0;
         this.variables = variables == null ? new HashMap<>() : variables;
@@ -39,7 +37,6 @@ public class ExpressionParser {
         this.allVariables.put("i", new Complex(0, 1));
     }
 
-    // ---------- PREPROCESS: inserir '*' quando necessário ----------
     private String preprocess(String expr) {
         if (expr == null || expr.isEmpty()) return "";
         StringBuilder processed = new StringBuilder();
@@ -57,14 +54,11 @@ public class ExpressionParser {
     }
 
     private boolean needsMultiplication(char c1, char c2) {
-        // casos que representam multiplicação implícita:
-        // 5x, 5(, )5, )(, x2, x(, )x
         return (Character.isDigit(c1) && (Character.isLetter(c2) || c2 == '(')) ||
                 (c1 == ')' && (Character.isDigit(c2) || Character.isLetter(c2) || c2 == '(')) ||
                 (Character.isLetter(c1) && (Character.isDigit(c2) || c2 == '('));
     }
 
-    // ---------- ENTRY POINT ----------
     public Complex evaluate() {
         root = null;
         position = 0;
@@ -77,12 +71,10 @@ public class ExpressionParser {
         return lastResult;
     }
 
-    // ---------- helpers para construir nó ----------
     private Node makeNode(String value, Node left, Node right) {
         return new Node(value, left, right);
     }
 
-    // ---------- parsing com construção de árvore (precedência) ----------
     private Complex evaluateAdditionSubtraction() {
         Node leftNode = null;
         Complex result = evaluateMultiplicationDivision();
@@ -152,7 +144,6 @@ public class ExpressionParser {
         return evaluateUnitary();
     }
 
-    // ---------- aqui tratamos literais complexos entre parênteses também ----------
     private Complex evaluateUnitary() {
         boolean isNegative = false;
 
@@ -163,7 +154,6 @@ public class ExpressionParser {
 
         Complex result;
 
-        // sqrt (símbolo "√")
         if (expression.substring(position).startsWith("√")) {
             position++;
             result = evaluateUnitary();
@@ -171,7 +161,6 @@ public class ExpressionParser {
             result = result.pow(0.5);
             root = new Node("√", child, null);
         }
-        // possível literal complexo entre parênteses: (3+2i) -> tenta parse
         else if (position < expression.length() && expression.charAt(position) == '(') {
             int savePos = position;
             int start = position + 1;
@@ -189,15 +178,12 @@ public class ExpressionParser {
 
             if (end != -1) {
                 String content = expression.substring(start, end);
-                // tenta interpretar content como número complexo literal usando Complex.parse
                 try {
                     Complex lit = Complex.parse(content);
-                    // consumiu "(content)"
                     position = end + 1;
                     result = lit;
-                    root = new Node(content); // mostra conteúdo sem parênteses
+                    root = new Node(content);
                 } catch (Exception ex) {
-                    // não é literal complexo — volta e trata como subexpressão
                     position = savePos;
                     position++; // consome '('
                     result = evaluateAdditionSubtraction();
@@ -208,7 +194,6 @@ public class ExpressionParser {
                 throw new IllegalArgumentException("Parênteses não fechados.");
             }
         }
-        // variável (um ou mais caracteres de letra)
         else if (position < expression.length() && Character.isLetter(expression.charAt(position))) {
             int start = position;
             while (position < expression.length() && Character.isLetter(expression.charAt(position)))
@@ -221,7 +206,6 @@ public class ExpressionParser {
             result = allVariables.get(varName);
             root = new Node(varName);
         }
-        // número real (ou literal sem i)
         else {
             int start = position;
             while (position < expression.length() &&
@@ -243,9 +227,7 @@ public class ExpressionParser {
         return result;
     }
 
-    // ---------- Export para DefaultMutableTreeNode (Swing) ----------
     public DefaultMutableTreeNode getExecutionTree() {
-        // cria nó raiz com o resultado e coloca a AST como filho
         String resultLabel = (lastResult != null) ? "Resultado: " + lastResult.toString() : "Resultado: (vazio)";
         DefaultMutableTreeNode top = new DefaultMutableTreeNode(resultLabel);
 
@@ -260,18 +242,15 @@ public class ExpressionParser {
 
         String label = n.value;
 
-        // se for variável, mostrar "x = valor"
         if (variables != null && variables.containsKey(n.value)) {
             Complex val = variables.get(n.value);
             label = n.value + " = " + val.toString();
         } else {
-            // tenta mostrar literais numéricos/complexos com formatação melhor
             try {
-                // se for algo que parseia como Complex (ex: "3+2i" ou "2i" ou "5"), mostrar formatado
                 Complex c = Complex.parse(n.value);
                 label = c.toString();
             } catch (Exception ignored) {
-                // não é literal numérico complexo; manter label original (operador, nome, etc)
+
             }
         }
 
@@ -283,7 +262,6 @@ public class ExpressionParser {
         return treeNode;
     }
 
-    // Se quiser expor a raiz e o último resultado programaticamente:
     public Node getAstRoot() {
         return root;
     }

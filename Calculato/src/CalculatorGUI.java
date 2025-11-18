@@ -135,7 +135,6 @@ public class CalculatorGUI extends JFrame implements ActionListener {
                 DefaultMutableTreeNode raiz = parser.getExecutionTree();
                 arvoreExecucao.setModel(new DefaultTreeModel(raiz));
 
-                // Expande toda a árvore para mostrar conteúdo
                 for (int i = 0; i < arvoreExecucao.getRowCount(); i++) {
                     arvoreExecucao.expandRow(i);
                 }
