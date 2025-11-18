@@ -1,4 +1,6 @@
 import javax.swing.*;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -11,6 +13,10 @@ import java.util.HashSet;
 public class CalculatorGUI extends JFrame implements ActionListener {
 
     private JTextField tela;
+    private JTree arvoreExecucao;
+    private JScrollPane scrollArvore;
+    private JPanel painelPrincipal;
+    private JTabbedPane abas;
 
     private final String[] botoes = {
             "sin", "cos", "tan", "log", "C",
@@ -23,21 +29,35 @@ public class CalculatorGUI extends JFrame implements ActionListener {
 
     public CalculatorGUI() {
         super("Calculadora de Complexos");
-        setTitle("Calculadora de Complexos");
-        setSize(500, 600);
+        setSize(600, 650);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout(5, 5));
+
+        abas = new JTabbedPane();
+
+        painelPrincipal = criarPainelCalculadora();
+        abas.add("Calculadora", painelPrincipal);
+
+        arvoreExecucao = new JTree(new DefaultMutableTreeNode("Nenhuma expressão avaliada"));
+        scrollArvore = new JScrollPane(arvoreExecucao);
+        abas.add("Árvore", scrollArvore);
+
+        add(abas);
+    }
+
+    private JPanel criarPainelCalculadora() {
+        JPanel painel = new JPanel(new BorderLayout(5, 5));
 
         tela = new JTextField();
         tela.setEditable(false);
         tela.setFont(new Font("Arial", Font.BOLD, 32));
         tela.setHorizontalAlignment(SwingConstants.RIGHT);
         tela.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        add(tela, BorderLayout.NORTH);
+        painel.add(tela, BorderLayout.NORTH);
 
-        JPanel painel = new JPanel();
-        painel.setLayout(new GridLayout(6, 5, 8, 8));
+        JPanel painelBotoes = new JPanel();
+        painelBotoes.setLayout(new GridLayout(6, 5, 8, 8));
+
         for (String texto : botoes) {
             JButton botao = new JButton(texto);
             botao.setFont(new Font("Arial", Font.BOLD, 20));
@@ -49,27 +69,22 @@ public class CalculatorGUI extends JFrame implements ActionListener {
             } else if (texto.length() > 1 || (!Character.isDigit(texto.charAt(0)) && !Objects.equals(texto, "."))) {
                 botao.setBackground(new Color(200, 200, 200));
             }
-
-            painel.add(botao);
+            painelBotoes.add(botao);
         }
 
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        centerPanel.add(painel, BorderLayout.CENTER);
-
-        add(centerPanel, BorderLayout.CENTER);
+        painel.add(painelBotoes, BorderLayout.CENTER);
+        painel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        return painel;
     }
 
     private Map<String, Complex> collectVariables(String expression) {
         Set<String> variableNames = new HashSet<>();
         Map<String, Complex> variableMap = new HashMap<>();
 
-        for (int i = 0; i < expression.length(); i++) {
-            char c = expression.charAt(i);
+        for (char c : expression.toCharArray()) {
             if (Character.isLetter(c)) {
                 String var = String.valueOf(c);
-
-                if (!var.equalsIgnoreCase("i") || (expression.length() == 1 && var.equalsIgnoreCase("i"))) {
+                if (!var.equalsIgnoreCase("i")) {
                     variableNames.add(var);
                 }
             }
@@ -78,30 +93,26 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         for (String varName : variableNames) {
             String input = JOptionPane.showInputDialog(
                     this,
-                    "Digite o valor complexo para a variável " + varName + " (Ex: 3+2i, -5, 1i, i)",
+                    "Digite o valor para " + varName + " (ex: 3+2i, -1, 4i)",
                     "Entrada de Variável",
                     JOptionPane.QUESTION_MESSAGE
             );
 
-            if (input == null || input.trim().isEmpty()) {
-                return null;
-            }
+            if (input == null) return null;
 
             try {
                 Complex value = Complex.parse(input);
                 variableMap.put(varName, value);
-            } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, "Valor complexo inválido para " + varName + ". Tente novamente.", "Erro de Entrada", JOptionPane.ERROR_MESSAGE);
-                return null;
+
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Erro inesperado ao analisar " + varName + ". Tente novamente.", "Erro de Entrada", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this,
+                        "Valor inválido para " + varName,
+                        "Erro", JOptionPane.ERROR_MESSAGE);
                 return null;
             }
         }
-
         return variableMap;
     }
-
 
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -113,40 +124,41 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         } else if (comando.equals("=")) {
             if (textoAtual.isEmpty()) return;
 
-            Map<String, Complex> variables = collectVariables(textoAtual);
-            if (variables == null) {
-                tela.setText("Cálculo Cancelado.");
-                return;
-            }
+            Map<String, Complex> vars = collectVariables(textoAtual);
+            if (vars == null) return;
 
             try {
-                ExpressionParser parser = new ExpressionParser(textoAtual, variables);
+                ExpressionParser parser = new ExpressionParser(textoAtual, vars);
                 Complex resultado = parser.evaluate();
                 tela.setText(resultado.toString());
 
-            } catch (IllegalArgumentException | ArithmeticException ex) {
-                tela.setText("Erro: " + ex.getMessage());
-                System.err.println("Erro na expressão: " + ex.getMessage());
+                DefaultMutableTreeNode raiz = parser.getExecutionTree();
+                arvoreExecucao.setModel(new DefaultTreeModel(raiz));
+
+                // Expande toda a árvore para mostrar conteúdo
+                for (int i = 0; i < arvoreExecucao.getRowCount(); i++) {
+                    arvoreExecucao.expandRow(i);
+                }
+
+                abas.setSelectedIndex(1);
+
             } catch (Exception ex) {
-                tela.setText("Erro Inesperado");
+                tela.setText("Erro");
                 ex.printStackTrace();
             }
+
         } else if (comando.equals("i")) {
             tela.setText(textoAtual + "i");
-        } else if (comando.equals("x") || comando.equals("y") || comando.equals("z")) {
+        } else if ("xyz".contains(comando)) {
             tela.setText(textoAtual + comando);
-        } else if (comando.equals("log") || comando.equals("sin") || comando.equals("cos") || comando.equals("tan")) {
+        } else if ("log sin cos tan".contains(comando)) {
             tela.setText(textoAtual + comando + "(");
-        }
-        else {
+        } else {
             tela.setText(textoAtual + comando);
         }
     }
 
-
-    public static void main(String[] args){
-        SwingUtilities.invokeLater(() ->{
-            new CalculatorGUI().setVisible(true);
-        });
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new CalculatorGUI().setVisible(true));
     }
 }
