@@ -91,12 +91,9 @@ public class CalculatorGUI extends JFrame implements ActionListener {
 
         for (int i = 0; i < expression.length(); i++) {
             char c = expression.charAt(i);
-            // collect single-letter variables and multi-letter (letters sequence)
             if (Character.isLetter(c)) {
-                // skip 'i' as imaginary unit
                 if (c == 'i' || c == 'I') continue;
                 StringBuilder sb = new StringBuilder();
-                // collect consecutive letters as variable name
                 int j = i;
                 while (j < expression.length() && Character.isLetter(expression.charAt(j))) {
                     sb.append(expression.charAt(j));
@@ -143,7 +140,6 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         if (expr2 == null) return;
 
         try {
-            // Build parsers (no variables asked here, structural compare only)
             ExpressionParser p1 = new ExpressionParser(expr1, new HashMap<>());
             p1.evaluate(); // build AST
             ExpressionParser p2 = new ExpressionParser(expr2, new HashMap<>());

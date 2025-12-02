@@ -2,20 +2,6 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import java.util.Map;
 import java.util.HashMap;
 
-/**
- * ExpressionParser.java
- *
- * Compatível com a sua classe Complex e CalculatorGUI.
- * - Constructor: ExpressionParser(String expression, Map<String, Complex> variables)
- * - evaluate(): avalia e constrói AST
- * - getExecutionTree(): retorna DefaultMutableTreeNode (com resultado no topo)
- * - getLispTree(): retorna string em formato LISP da AST
- * - structurallyEquals(other): comparação estrutural (ordem sensível)
- *
- * Observações:
- * - Funções sin/cos/tan/log aceitam apenas argumentos reais (imag == 0) por simplicidade.
- * - Literais complexos devem ser escritos entre parênteses: (3+2i) ou (2i) ou (5)
- */
 public class ExpressionParser {
 
     private String expression;
@@ -49,7 +35,6 @@ public class ExpressionParser {
         this.allVariables.put("i", new Complex(0, 1));
     }
 
-    // Insere multiplicação implícita (ex: 2x -> 2*x, 2( -> 2*(, )2 -> )*2, x( -> x*( )
     private String preprocess(String expr) {
         if (expr == null || expr.isEmpty()) return "";
         StringBuilder out = new StringBuilder();
@@ -69,7 +54,6 @@ public class ExpressionParser {
                 (Character.isLetter(c1) && (Character.isDigit(c2) || c2 == '('));
     }
 
-    // ENTRY POINT: avalia e monta AST
     public Complex evaluate() {
         root = null;
         position = 0;
@@ -85,7 +69,6 @@ public class ExpressionParser {
         return new Node(value, left, right);
     }
 
-    // + and -
     private Complex evaluateAdditionSubtraction() {
         Node leftNode = null;
         Complex result = evaluateMultiplicationDivision();
@@ -109,7 +92,6 @@ public class ExpressionParser {
         return result;
     }
 
-    // * and /
     private Complex evaluateMultiplicationDivision() {
         Node leftNode = null;
         Complex result = evaluatePower();
@@ -133,7 +115,6 @@ public class ExpressionParser {
         return result;
     }
 
-    // ^
     private Complex evaluatePower() {
         Complex result = evaluatePrimary();
         Node baseNode = root;
@@ -155,7 +136,6 @@ public class ExpressionParser {
         return evaluateUnitary();
     }
 
-    // trata sinais unários, funções, literais complexos, variáveis e números
     private Complex evaluateUnitary() {
         boolean isNegative = false;
         if (position < expression.length() && expression.charAt(position) == '-') {
@@ -165,50 +145,24 @@ public class ExpressionParser {
 
         Complex result;
 
-        // funções: sin,cos,tan,log  (nome seguido de '(')
+        // Bloco modificado: Apenas processa variáveis, ignorando funções
         if (position < expression.length() && Character.isLetter(expression.charAt(position))) {
             int start = position;
-            while (position < expression.length() && Character.isLetter(expression.charAt(position))) position++;
+            // Lê o nome completo (ex: "x", "total", "var1")
+            while (position < expression.length() && Character.isLetter(expression.charAt(position))) {
+                position++;
+            }
             String name = expression.substring(start, position);
 
-            // se for função seguida de '('
-            if (position < expression.length() && expression.charAt(position) == '(') {
-                // consume '('
-                position++;
-                Complex arg = evaluateAdditionSubtraction();
-                if (position < expression.length() && expression.charAt(position) == ')') position++;
-                else throw new IllegalArgumentException("Parênteses da função não fechados.");
-
-                // construir nó da função na AST
-                // arg AST já em root; guardamos e montamos novo nó
-                Node argNode = root;
-                root = makeNode(name, argNode, null);
-
-                // aplicar função (apenas para real simples; para complexos lançar exceção)
-                if (arg.getImag() != 0) {
-                    throw new IllegalArgumentException("Funções trigonométricas/log para parte imaginária não suportadas.");
-                }
-                double v = arg.getReal();
-                switch (name) {
-                    case "sin": result = new Complex(Math.sin(v), 0); break;
-                    case "cos": result = new Complex(Math.cos(v), 0); break;
-                    case "tan": result = new Complex(Math.tan(v), 0); break;
-                    case "log":
-                        if (v <= 0) throw new IllegalArgumentException("log de número não-positivo.");
-                        result = new Complex(Math.log(v), 0); break;
-                    default:
-                        throw new IllegalArgumentException("Função desconhecida: " + name);
-                }
-            } else {
-                // não é função: trata como variável (multi-letter)
-                String varName = name;
-                if (!allVariables.containsKey(varName))
-                    throw new IllegalArgumentException("Variável desconhecida: " + varName);
-                result = allVariables.get(varName);
-                root = new Node(varName);
+            // A lógica de verificar '(' e switch case foi removida.
+            // Agora tratamos tudo como variável.
+            if (!allVariables.containsKey(name)) {
+                throw new IllegalArgumentException("Variável desconhecida: " + name);
             }
+            result = allVariables.get(name);
+            root = new Node(name);
         }
-        // sqrt symbol (√)
+        // O resto continua igual (Raiz quadrada)
         else if (expression.substring(position).startsWith("√")) {
             position++;
             result = evaluateUnitary();
@@ -216,7 +170,7 @@ public class ExpressionParser {
             result = result.pow(0.5);
             root = new Node("√", child, null);
         }
-        // parenthesis: tenta literal complexo entre parênteses (3+2i) -> parse com Complex.parse
+        // O resto continua igual (Parênteses)
         else if (position < expression.length() && expression.charAt(position) == '(') {
             int save = position;
             int start = position + 1;
@@ -236,9 +190,8 @@ public class ExpressionParser {
                     result = lit;
                     root = new Node(content);
                 } catch (Exception ex) {
-                    // não literal -> expressão entre parênteses
                     position = save;
-                    position++; // consume '('
+                    position++;
                     result = evaluateAdditionSubtraction();
                     if (position < expression.length() && expression.charAt(position) == ')') position++;
                     else throw new IllegalArgumentException("Parênteses não fechados.");
@@ -247,7 +200,7 @@ public class ExpressionParser {
                 throw new IllegalArgumentException("Parênteses não fechados.");
             }
         }
-        // número real
+        // O resto continua igual (Números)
         else if (position < expression.length() && (Character.isDigit(expression.charAt(position)) || expression.charAt(position) == '.')) {
             int start = position;
             while (position < expression.length() &&
@@ -257,7 +210,7 @@ public class ExpressionParser {
             result = new Complex(Double.parseDouble(num), 0);
             root = new Node(num);
         }
-        // apenas 'i' imaginário
+        // O resto continua igual (Unidade imaginária i)
         else if (position < expression.length() && (expression.charAt(position) == 'i' || expression.charAt(position) == 'I')) {
             position++;
             result = new Complex(0, 1);
@@ -274,7 +227,6 @@ public class ExpressionParser {
         return result;
     }
 
-    // Gera DefaultMutableTreeNode com nó topo com resultado e AST abaixo
     public DefaultMutableTreeNode getExecutionTree() {
         String resultLabel = (lastResult != null) ? "Resultado: " + lastResult.toString() : "Resultado: (vazio)";
         DefaultMutableTreeNode top = new DefaultMutableTreeNode(resultLabel);
@@ -301,7 +253,6 @@ public class ExpressionParser {
         return treeNode;
     }
 
-    // Gera string LISP da AST (sem o nó Resultado no topo)
     public String getLispTree() {
         if (root == null) return "";
         return buildLisp(root);
@@ -318,7 +269,6 @@ public class ExpressionParser {
         return "(" + n.value + " " + buildLisp(n.left) + " " + buildLisp(n.right) + ")";
     }
 
-    // structural equality (order-sensitive)
     public boolean structurallyEquals(ExpressionParser other) {
         return compareNodes(this.root, other.root);
     }
