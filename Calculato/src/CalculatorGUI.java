@@ -28,6 +28,11 @@ public class CalculatorGUI extends JFrame implements ActionListener {
             "^", "√", "0", "=", "==",
     };
 
+    /**
+     * Construtor da classe CalculatorGUI.
+     * Responsável por inicializar as configurações da janela principal e montar
+     * as abas da interface (Calculadora, Árvore de Execução e formato LISP).
+     */
     public CalculatorGUI() {
         super("Calculadora de Complexos");
         setSize(800, 700);
@@ -36,15 +41,16 @@ public class CalculatorGUI extends JFrame implements ActionListener {
 
         abas = new JTabbedPane();
 
+        // Inicializa a aba principal da calculadora
         painelPrincipal = criarPainelCalculadora();
         abas.add("Calculadora", painelPrincipal);
 
-        // Árvore Swing
+        // Aba da Árvore Swing (mostra a hierarquia das operações)
         arvoreExecucao = new JTree(new DefaultMutableTreeNode("Nenhuma expressão avaliada"));
         scrollArvore = new JScrollPane(arvoreExecucao);
         abas.add("Árvore", scrollArvore);
 
-        // Aba LISP (texto)
+        // Aba LISP (mostra a expressão em formato de texto estruturado)
         lispArea = new JTextArea();
         lispArea.setEditable(false);
         JScrollPane scrollLisp = new JScrollPane(lispArea);
@@ -53,9 +59,15 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         add(abas);
     }
 
+    /**
+     * Cria o painel visual da calculadora, incluindo o visor (JTextField)
+     * e a grade de botões para inserção de números e operações.
+     * * @return JPanel configurado com o layout da calculadora.
+     */
     private JPanel criarPainelCalculadora() {
         JPanel painel = new JPanel(new BorderLayout(5, 5));
 
+        // Configuração do visor onde as expressões aparecerão
         tela = new JTextField();
         tela.setEditable(false);
         tela.setFont(new Font("Arial", Font.BOLD, 32));
@@ -63,6 +75,7 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         tela.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         painel.add(tela, BorderLayout.NORTH);
 
+        // Configuração da grade de botões (6 linhas, 5 colunas)
         JPanel painelBotoes = new JPanel();
         painelBotoes.setLayout(new GridLayout(6, 5, 8, 8));
 
@@ -71,6 +84,7 @@ public class CalculatorGUI extends JFrame implements ActionListener {
             botao.setFont(new Font("Arial", Font.BOLD, 20));
             botao.addActionListener(this);
 
+            // Estilização customizada para o botão de "=" e para botões de operações/letras
             if (Objects.equals(texto, "=")) {
                 botao.setBackground(new Color(0, 128, 255));
                 botao.setForeground(Color.WHITE);
@@ -85,14 +99,22 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         return painel;
     }
 
+    /**
+     * Analisa a expressão matemática atual em busca de variáveis alfabéticas
+     * (ignorando o 'i' que representa o número imaginário). Em seguida, pede
+     * ao usuário para inserir o valor para cada variável encontrada.
+     * * @param expression A expressão matemática sendo avaliada.
+     * @return Um mapa (Map) ligando o nome da variável ao seu valor Complexo, ou null em caso de erro ou cancelamento.
+     */
     private Map<String, Complex> collectVariables(String expression) {
         Set<String> variableNames = new HashSet<>();
         Map<String, Complex> variableMap = new HashMap<>();
 
+        // Percorre a expressão procurando por letras para identificar variáveis
         for (int i = 0; i < expression.length(); i++) {
             char c = expression.charAt(i);
             if (Character.isLetter(c)) {
-                if (c == 'i' || c == 'I') continue;
+                if (c == 'i' || c == 'I') continue; // Ignora a unidade imaginária
                 StringBuilder sb = new StringBuilder();
                 int j = i;
                 while (j < expression.length() && Character.isLetter(expression.charAt(j))) {
@@ -105,6 +127,7 @@ public class CalculatorGUI extends JFrame implements ActionListener {
             }
         }
 
+        // Abre pop-ups pedindo os valores de cada variável encontrada
         for (String varName : variableNames) {
             String input = JOptionPane.showInputDialog(
                     this,
@@ -113,10 +136,12 @@ public class CalculatorGUI extends JFrame implements ActionListener {
                     JOptionPane.QUESTION_MESSAGE
             );
 
+            // Cancela o processo se o usuário não digitar nada
             if (input == null || input.trim().isEmpty()) {
                 return null;
             }
 
+            // Tenta converter o valor digitado para a classe Complex
             try {
                 Complex value = Complex.parse(input);
                 variableMap.put(varName, value);
@@ -132,6 +157,10 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         return variableMap;
     }
 
+    /**
+     * Solicita ao usuário duas expressões diferentes e verifica se as suas
+     * Árvores de Sintaxe Abstrata (AST) são estruturalmente idênticas.
+     */
     private void compararExpressoes() {
         String expr1 = JOptionPane.showInputDialog(this, "Digite a primeira expressão:");
         if (expr1 == null) return;
@@ -140,11 +169,13 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         if (expr2 == null) return;
 
         try {
+            // Cria parsers e constrói as árvores para as duas expressões
             ExpressionParser p1 = new ExpressionParser(expr1, new HashMap<>());
-            p1.evaluate(); // build AST
+            p1.evaluate(); // Constrói a AST
             ExpressionParser p2 = new ExpressionParser(expr2, new HashMap<>());
             p2.evaluate();
 
+            // Compara estruturalmente as duas árvores criadas
             boolean iguais = p1.structurallyEquals(p2);
 
             JOptionPane.showMessageDialog(this,
@@ -159,14 +190,21 @@ public class CalculatorGUI extends JFrame implements ActionListener {
     }
 
 
+    /**
+     * Método acionado sempre que um botão da calculadora é clicado.
+     * Direciona a ação baseada no texto do botão clicado (limpar, calcular, adicionar letra/número, etc.).
+     * * @param e O evento de clique capturado pela interface.
+     */
     @Override
     public void actionPerformed(ActionEvent e) {
         String comando = e.getActionCommand();
         String textoAtual = tela.getText();
 
         if (comando.equals("C")) {
+            // Limpa o visor
             tela.setText("");
         } else if (comando.equals("=")) {
+            // Inicia o processo de avaliação matemática da expressão
             if (textoAtual.isEmpty()) return;
 
             Map<String, Complex> vars = collectVariables(textoAtual);
@@ -177,18 +215,20 @@ public class CalculatorGUI extends JFrame implements ActionListener {
                 Complex resultado = parser.evaluate();
                 tela.setText(resultado.toString());
 
+                // Atualiza a visualização gráfica da árvore de execução
                 DefaultMutableTreeNode raiz = parser.getExecutionTree();
                 arvoreExecucao.setModel(new DefaultTreeModel(raiz));
 
-                // Expande toda a árvore
+                // Expande toda a árvore para facilitar visualização
                 for (int i = 0; i < arvoreExecucao.getRowCount(); i++) {
                     arvoreExecucao.expandRow(i);
                 }
 
-                // Também atualiza aba LISP
+                // Atualiza a aba com a formatação em texto LISP
                 String lisp = parser.getLispTree();
                 lispArea.setText(lisp);
 
+                // Muda o foco automaticamente para a aba da Árvore
                 abas.setSelectedIndex(1);
 
             } catch (Exception ex) {
@@ -199,12 +239,16 @@ public class CalculatorGUI extends JFrame implements ActionListener {
         } else if (comando.equals("i")) {
             tela.setText(textoAtual + "i");
         } else if ("xyz".contains(comando)) {
+            // Adiciona variáveis simples ao visor
             tela.setText(textoAtual + comando);
         } else if ("log sin cos tan".contains(comando)) {
+            // Adiciona funções trigonométricas abrindo parênteses
             tela.setText(textoAtual + comando + "(");
         } else if (comando.equals("==")) {
+            // Dispara a funcionalidade de comparação de expressões
             compararExpressoes();
-        }else if (comando.equals("Conj")) {
+        } else if (comando.equals("Conj")) {
+            // Calcula o conjugado de uma expressão avaliada
             try {
                 textoAtual = tela.getText();
                 if (textoAtual.isEmpty()) return;
@@ -215,10 +259,11 @@ public class CalculatorGUI extends JFrame implements ActionListener {
                 ExpressionParser parser = new ExpressionParser(textoAtual, vars);
                 Complex resultado = parser.evaluate();
 
-                Complex conj = resultado.conjugate();
+                Complex conj = resultado.conjugate(); // Aplica a operação matemática de conjugado
 
                 tela.setText(conj.toString());
 
+                // Atualiza a árvore englobando-a em um nó "conjugado"
                 DefaultMutableTreeNode raiz = new DefaultMutableTreeNode("conjugado");
                 raiz.add(parser.getExecutionTree());
                 arvoreExecucao.setModel(new DefaultTreeModel(raiz));
@@ -230,10 +275,15 @@ public class CalculatorGUI extends JFrame implements ActionListener {
             }
         }
         else {
+            // Qualquer outro caractere (números, operadores matemáticos) é apenas adicionado ao visor
             tela.setText(textoAtual + comando);
         }
     }
 
+    /**
+     * Ponto de entrada (entry point) principal do programa.
+     * Inicia a Interface Gráfica na Thread correta (Event Dispatch Thread).
+     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new CalculatorGUI().setVisible(true));
     }
